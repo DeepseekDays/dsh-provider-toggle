@@ -7,15 +7,15 @@
 > **One-click enable/disable switch for every model provider in DeepSeek Harness**, sitting in **Settings → Models** right next to *Edit*.
 > Turn a provider off and it leaves the composer's model picker; turn it back on and it returns.
 
-![The switch to the left of Edit on every provider row](preview/placement-zoom.png)
+![The switch to the left of Edit on every provider row](assets/placement-zoom.png)
 *The switch lands to the left of the **Edit** button on each row (screenshot from the offline geometry harness — all 3 rows pass).*
 
 ```
 Settings → Models
-┌──────────────────────────────────────────────┐
-│ opencode-go                       ●   ( ) Edit  Delete │  ← switch, left of Edit
-│                                           ↑             │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ opencode-go                   ●   ( )  Edit  Delete  │  ← switch, left of Edit
+│                                   ↑                  │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -32,7 +32,7 @@ dsh plugin --profile desktop add github:DeepseekDays/dsh-provider-toggle
 
 From a checkout — same three steps, but **without running pnpm**:
 
-```bash
+```sh
 node install.mjs              # install or repair
 node install.mjs --dry        # show what would change
 node install.mjs --uninstall  # uninstall (keeps the folder)
@@ -102,29 +102,48 @@ Slot content renders **below** rowHead by default (inside the same card). To sit
 CSS Module hashes, hence the `[class*=...]` substring selectors). **If it cannot measure, it
 falls back to inline layout — the feature keeps working.**
 
-## Verification
+## Requirements and compatibility
 
-Three offline harnesses, none of which needs DSH running (each re-implements the contract
-independently, then the results are compared):
+- A DSH that provides the `settings.models.provider-card` keyed slot and
+  `@deepseek-ai/dsh-client-ui-primitives` (tested against DSH Desktop `2.0.17` /
+  `dsh-base` `0.2.0-rc.2`).
+- Declares `dsh.bundle` in `package.json`, so it installs with plain `dsh plugin add`.
+- **No kernel files are modified.** The plugin wraps `ctx.llm.listModels()` at runtime and
+  restores it on unload (reference-counted, so repeated apply/unload does not stack wrappers).
+- **Coexists with `dsh-ofm-model-manager`** (per-model enable/disable and renaming). Both
+  wrap the same `listModels`, both are reference-counted, and their preference keys are
+  independent.
+- Runtime dependencies: **none**.
 
-```bash
+## Development
+
+```sh
 node test-filter.mjs              # host logic: 16 assertions
 node test-client.mjs              # client logic: 13 assertions
 node preview/placement-check.mjs  # layout geometry + screenshot
 ```
 
-- `test-filter.mjs` re-implements `buildModelCatalog()`'s group filtering and covers
-  "off → gone / on → back / uninstall → restored / repeated apply does not stack / the
-  fallback path when config is not a ref".
-- `test-client.mjs` drives a minimal fake React to check the slot registration shape, the
-  `Switch` state and the `mutate` arguments.
-- `preview/placement-check.mjs` extracts the **real CSS** from a DSH installation (Settings
-  row styles and the frontend Switch module), extracts the **real `placeSwitch()`** out of
-  `client.js`, rebuilds the DOM React would produce, and measures geometry + screenshots
-  through local Edge over CDP (`preview/placement.html` / `placement.png` /
-  `placement-zoom.png`). Pass criteria: switch's right edge 6–11 px from *Edit*, vertical
-  centre delta < 3 px, inside the card, no overlap with the button group. Needs `DSH_APP_DIR`
-  (default `F:/DSH/DSH Desktop/resources/app`) and `EDGE_PATH`.
+Three offline harnesses — no DSH session, no network required for the first two:
+
+| File | Covers |
+| --- | --- |
+| `test-filter.mjs` | host logic: does a disabled provider really leave the catalog, does re-enabling restore it, does unload revert, does a repeated apply stack, the fallback path when the config is not a ref |
+| `test-client.mjs` | loads `client.js` with a minimal fake React: slot registration shape, `Switch` state, the exact `mutate` arguments, silent no-render when the namespace is unavailable |
+| `preview/placement-check.mjs` | geometry: extracts the **real CSS** and the **real `placeSwitch()`** from a DSH installation, rebuilds the DOM, measures through local Edge + CDP and screenshots |
+
+The suites re-implement the expected behaviour (they replicate DSH's
+`groups.filter(group => group.models.length > 0)` rather than calling the code under test)
+so they cannot pass by agreeing with themselves. The placement harness needs `DSH_APP_DIR`
+(default `F:/DSH/DSH Desktop/resources/app`) and `EDGE_PATH`.
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+| --- | --- |
+| No switch appears at all | The bundle was not read: **fully quit DSH (tray included) and start again**. Confirm the package name is in `dsh.profile.bundles`. |
+| The switch renders inline instead of left of *Edit* | Measurement failed — DSH probably changed the Settings row structure (no more `rowHead` / `rowActions` class substrings). The feature still works. |
+| Flipping the switch does nothing | The settings namespace is not exposed (check the console for `settings namespace "dsh-provider-toggle" is not exposed`), or the write was rejected because the field is not volatile. |
+| A provider you disabled vanished | That is the intended behaviour. To recover: Settings → Models → flip it back, or clear `config.disabled` in the `id: dsh-provider-toggle` entry of the profile's `cordis.patch.yml`. |
 
 ## Known limits
 
@@ -146,12 +165,22 @@ node preview/placement-check.mjs  # layout geometry + screenshot
 - Third-party clients that fetch their own model catalog (e.g. a standalone panel from the
   marketplace) are unaffected.
 
-## Relationship to other plugins
+## Files
 
-Coexists with `dsh-ofm-model-manager` (per-model enable/disable and renaming): both only
-shape the model catalog, and their preference keys are independent. This plugin is an
-ordinary bundle in the profile and **modifies no kernel file**.
+```
+index.js                     host half: filters listModels() per provider
+client.js                    browser half: the switch in the Settings row
+cordis.patch.yml             bundle declaration
+install.mjs                  install / uninstall / dry run
+preview/placement-check.mjs  offline geometry harness
+preview/placement.html       DOM replica used by the harness
+preview/*.png                harness screenshots
+test-filter.mjs              host suite
+test-client.mjs              client suite
+test-resolve-hook.mjs        module resolution smoke test
+assets/                      screenshots used by this README
+```
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).

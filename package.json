@@ -35,6 +35,7 @@
     "LICENSE",
     "README.md",
     "README.zh.md",
+    "assets",
     "client.js",
     "cordis.patch.yml",
     "index.js",

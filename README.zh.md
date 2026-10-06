@@ -7,20 +7,33 @@
 > 给 DSH「设置 → 模型」的每一行加一个**一键开关**（就在「编辑」左边）：
 > 关掉哪个提供商，它就从主界面「选择模型」栏里消失；再打开就回来。
 
-![设置 → 模型 每行「编辑」左边的开关](preview/placement-zoom.png)
+![设置 → 模型 每行「编辑」左边的开关](assets/placement-zoom.png)
 *开关落在每行「编辑」按钮左边（离线几何验证台截图，3 行全部通过）。*
 
 ```
 设置 → 模型
-┌──────────────────────────────────────────────┐
-│ opencode-go                       ●   ( ) 编辑 删除 │  ← 开关在「编辑」左边
-│                                           ↑          │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ opencode-go                   ●   ( )  编辑   删除   │  ← 开关在「编辑」左边
+│                                   ↑                  │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 装 / 卸
+## 目录
+
+- [安装 / 升级](#安装--升级)
+- [怎么实现的](#怎么实现的)
+- [环境与兼容](#环境与兼容)
+- [开发](#开发)
+- [故障排查](#故障排查)
+- [已知边界](#已知边界)
+- [文件](#文件)
+- [许可](#许可)
+
+---
+
+## 安装 / 升级
 
 从 GitHub 一行装：
 
@@ -32,7 +45,7 @@ dsh plugin --profile desktop add github:DeepseekDays/dsh-provider-toggle
 
 从本地检出装（同样三步，但不跑 pnpm）：
 
-```bash
+```sh
 node install.mjs              # 安装或修复
 node install.mjs --dry        # 只看会改什么
 node install.mjs --uninstall  # 卸载（保留插件目录）
@@ -95,24 +108,47 @@ slot 的内容默认渲染在 rowHead **下面**（同一张卡片里）。为�
 `getBoundingClientRect()`，把自己绝对定位过去（类名是 CSS Module 哈希，
 所以用 `[class*=...]` 子串选择器）。**量不到就退回行内布局，功能不受影响。**
 
-## 验证
+## 环境与兼容
 
-不启动 DSH 的三个离线验证台（都各自独立实现一遍口径，再逐项比对）：
+- 需要提供 `settings.models.provider-card` keyed slot 与
+  `@deepseek-ai/dsh-client-ui-primitives` 的 DSH（实测 DSH Desktop `2.0.17` /
+  `dsh-base` `0.2.0-rc.2`）。
+- `package.json` 里声明了 `dsh.bundle`，所以能直接用 `dsh plugin add` 装。
+- **不改任何内核文件。** 运行时包一层 `ctx.llm.listModels()`，卸载时还原
+  （带引用计数，重复 apply / 卸载不会叠加包装）。
+- **与 `dsh-ofm-model-manager` 共存**（逐模型启用/停用与改名）：两者包装同一个
+  `listModels`、都带引用计数，偏好键互相独立。
+- 运行时依赖：**无**。
 
-```bash
-node test-filter.mjs            # host 逻辑：16 项
-node test-client.mjs            # client 逻辑：13 项
+## 开发
+
+```sh
+node test-filter.mjs              # host 逻辑：16 项
+node test-client.mjs              # client 逻辑：13 项
 node preview/placement-check.mjs  # 版式几何 + 截图
 ```
 
-- `test-filter.mjs` 复刻了 `buildModelCatalog()` 的分组过滤，验证「关掉 → 消失 /
-  打开 → 回来 / 卸载 → 还原 / 重复 apply 不叠加 / config 不是 ref 时的兜底路径」。
-- `test-client.mjs` 用最小化的假 React 验证插槽注册形状、`Switch` 状态与 `mutate` 入参。
-- `preview/placement-check.mjs` 会从**真实 DSH 安装**里抽出设置页 CSS 与主界面开关 CSS，
-  再抽出 client.js 里**真的 `placeSwitch()`**，搭一份 DOM 复刻，用本机 Edge + CDP
-  量几何并截图（产物 `preview/placement.html` / `placement.png` / `placement-zoom.png`）。
-  判据：开关右边缘距「编辑」6~11px、垂直中心差 <3px、不越出卡片、不与按钮组重叠。
-  需要 `DSH_APP_DIR`（默认 `F:/DSH/DSH Desktop/resources/app`）与 `EDGE_PATH`。
+三个离线验证台（前两个不需要 DSH 会话，也不需要网络）：
+
+| 文件 | 覆盖 |
+| --- | --- |
+| `test-filter.mjs` | host 逻辑：关掉后真的从目录里消失？打开真的回来？卸载真的还原？重复 apply 会叠加吗？config 不是 ref 时的兜底路径 |
+| `test-client.mjs` | 用最小化的假 React 加载 `client.js`：插槽注册形状、`Switch` 状态、`mutate` 的精确入参、命名空间不可用时静默不渲染 |
+| `preview/placement-check.mjs` | 几何：从**真实 DSH 安装**抽出真 CSS 与 client.js 里**真的 `placeSwitch()`**，搭 DOM 复刻，用本机 Edge + CDP 量几何并截图 |
+
+这些台子都**自己独立实现一遍口径**（复刻 DSH 的
+`groups.filter(group => group.models.length > 0)`，而不是调用被测代码），
+所以不会因为"跟自己一致"而通过。几何台需要 `DSH_APP_DIR`
+（默认 `F:/DSH/DSH Desktop/resources/app`）与 `EDGE_PATH`。
+
+## 故障排查
+
+| 现象 | 原因 / 处理 |
+| --- | --- |
+| 完全没有开关 | bundle 没被读取：**完全退出 DSH（含托盘）再启动**。确认包名在 `dsh.profile.bundles` 里。 |
+| 开关显示在行内，不在「编辑」左边 | 测量失败 —— DSH 大概改了设置页的行结构（类名里没有 `rowHead` / `rowActions` 了）。功能照常。 |
+| 点开关没反应 | settings 命名空间没暴露（控制台会有 `settings namespace "dsh-provider-toggle" is not exposed`），或写入被拒（字段没标 volatile）。 |
+| 被关掉的提供商整行没了 | 这是设计行为。救法：设置 → 模型 → 把开关打开，或编辑 profile 的 `cordis.patch.yml` 清空 `id: dsh-provider-toggle` 那条的 `config.disabled`。 |
 
 ## 已知边界
 
@@ -131,11 +167,22 @@ node preview/placement-check.mjs  # 版式几何 + 截图
   没了），开关会退回"行内显示"——功能照常，只是位置不再是「编辑」左边。
 - 第三方客户端（如市场里的独立面板）如果自己拉一份模型目录，不受本插件影响。
 
-## 和别的插件的关系
+## 文件
 
-与 `dsh-ofm-model-manager`（逐模型启用/停用与改名）共存：两者都只影响模型目录，
-偏好键互相独立。本插件是 profile 里的一个普通 bundle，**不改任何内核文件**。
+```
+index.js                     host 半端：逐 provider 过滤 listModels()
+client.js                    浏览器半端：设置行里的开关
+cordis.patch.yml             bundle 声明
+install.mjs                  安装 / 卸载 / dry run
+preview/placement-check.mjs  离线几何验证台
+preview/placement.html       验证台用的 DOM 复刻
+preview/*.png                验证台截图
+test-filter.mjs              host 验证台
+test-client.mjs              client 验证台
+test-resolve-hook.mjs        模块解析冒烟测试
+assets/                      README 用的截图
+```
 
 ## 许可
 
-MIT
+MIT —— 见 [LICENSE](LICENSE)。
