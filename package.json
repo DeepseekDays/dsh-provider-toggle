@@ -14,9 +14,12 @@
     "dsh",
     "dsh-plugin",
     "deepseek-harness",
+    "cordis",
     "provider",
     "model",
-    "toggle"
+    "toggle",
+    "model-selector",
+    "settings"
   ],
   "license": "MIT",
   "private": true,
@@ -31,6 +34,7 @@
   "files": [
     "LICENSE",
     "README.md",
+    "README.zh.md",
     "client.js",
     "cordis.patch.yml",
     "index.js",
