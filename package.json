@@ -1,0 +1,66 @@
+{
+  "name": "dsh-provider-toggle",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DeepseekDays/dsh-provider-toggle.git"
+  },
+  "homepage": "https://github.com/DeepseekDays/dsh-provider-toggle#readme",
+  "bugs": {
+    "url": "https://github.com/DeepseekDays/dsh-provider-toggle/issues"
+  },
+  "description": "DSH 模型提供商一键开关：在「设置 → 模型」每个提供商行（「编辑」左侧）放一个开关，关掉后该提供商从主界面模型选择栏里消失，重新打开即恢复。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "provider",
+    "model",
+    "toggle"
+  ],
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "client.js",
+    "cordis.patch.yml",
+    "index.js",
+    "install.mjs",
+    "preview",
+    "test-client.mjs",
+    "test-filter.mjs",
+    "test-resolve-hook.mjs"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-settings-models"
+      ],
+      "platform": "web"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+# ============================================================================
+# dsh-provider-toggle — DSH bundle patch（插件自带的挂载声明）
+# ============================================================================
+# 只做一件事：把插件本体插进 profile 的 loader 树。
+#   · host 半端（index.js）：包装 ctx.llm.listModels()，把被关掉的 provider route
+#     返回空数组 —— DSH 的 buildModelCatalog() 会丢弃"模型数为 0"的 provider 分组，
+#     于是它就从主界面「选择模型」栏里消失了。
+#   · client 半端（client.js / exports["./client"]）：在「设置 → 模型」每行的
+#     「编辑」左侧渲染一个开关。
+#
+# ⚠️ `disabled` 这个字段是**开关状态唯一的存放处**：
+#   · 它是 `.volatile()` 的（见 index.js 的 Config），所以设置服务可以写它，
+#     而且改完是**热更新**（loader 发 loader/volatile-update，本插件随即广播
+#     llm/adapters-updated，浏览器当场重载模型目录），不用重启 DSH。
+#   · 用户点开关写入的值会落在 **profile 的 cordis.patch.yml**（profile 层永远
+#     最后应用），覆盖这里写的 `[]`。想一键全部恢复默认，把 profile 里那条
+#     `id: dsh-provider-toggle` 的 config 删掉即可。
+#
+# 本文件属于插件自己、不在 profile 目录里 —— 在设置界面点任何东西都不会被冲掉。
+# ============================================================================
+
+- insert:
+    - id: dsh-provider-toggle
+      # Node 可解析的包名 —— 必须与 package.json 的 name 一致
+      name: dsh-provider-toggle
+      config:
+        # 被关掉的 provider route（模型选择器里隐藏）。开箱为空：全部可见。
+        # 例：['opencode-go', 'openai']
+        disabled: []
